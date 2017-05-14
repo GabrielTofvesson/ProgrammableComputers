@@ -1,0 +1,16 @@
+[
+{
+  "modid": "pcomp",
+  "name": "Programmable Computers",
+  "description": "Java-programmable computers",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "www.tofvesson.net",
+  "updateUrl": "",
+  "authorList": ["W1zzRD"],
+  "credits": "The Forge and FML guys",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
