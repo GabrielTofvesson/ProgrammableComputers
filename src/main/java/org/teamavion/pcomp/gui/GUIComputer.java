@@ -1,11 +1,16 @@
 package org.teamavion.pcomp.gui;
 
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.nbt.NBTTagCompound;
 import org.lwjgl.input.Keyboard;
+import org.teamavion.pcomp.PComp;
+import org.teamavion.pcomp.net.DataListener;
 import org.teamavion.pcomp.tile.TileEntityComputer;
+import org.teamavion.util.support.NetworkChannel;
 import org.teamavion.util.support.Reflection;
 import org.teamavion.util.support.Result;
 
@@ -17,9 +22,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 @SuppressWarnings({"unchecked", "WeakerAccess"})
-public class GUIComputer extends GuiScreen{
+public class GUIComputer extends GuiScreen implements DataListener<HashMap<Integer, String>>{
 
     protected final int viewportMin = -90, viewportMax = 45, maxInputLines = 128, textFieldLen = 240, textColor = 0xFFFFFF;
     protected final long keyPressTimeout = 0; // timeout period between keypresses to minimize spam
@@ -49,6 +55,7 @@ public class GUIComputer extends GuiScreen{
         button = new GuiButton(-1, this.width / 2 - textFieldLen / 2, this.height / 2 + viewportMax + 30, "Execute");
         button.width = textFieldLen;
         inputLines[selected].setFocused(true);
+        computer.registerDataListener(this);
     }
 
     @Override
@@ -236,8 +243,26 @@ public class GUIComputer extends GuiScreen{
     }
 
     @Override
+    public void onGuiClosed() {
+        computer.unregisterDataListener(this);
+        for(int i = 0; i<inputLines.length; ++i) computer.writeLine(i, inputLines[i].getText());
+        NBTTagCompound n = new NBTTagCompound();
+        computer.writeToNBT(n);
+        JsonObject j = new JsonObject();
+        j.addProperty("tag", n.toString().replace("&", "&amp;").replace("\"", "&quot;").replace("{", "&lbr;").replace("}", "&rbr;"));
+        PComp.instance.channel.sendToServer(new NetworkChannel.WorldEvent(computer.getPos(), computer.getWorld().provider.getDimension(), j));
+        computer.markDirty();
+        super.onGuiClosed();
+    }
+
+    @Override
     protected void mouseReleased(int mouseX, int mouseY, int state) {
         super.mouseReleased(mouseX, mouseY, state);
         button.mouseReleased(mouseX, mouseY);
+    }
+
+    @Override
+    public void getData(HashMap<Integer, String> data) {
+        for(int i = 0; i<inputLines.length; ++i) inputLines[i].setText(data.getOrDefault(i, ""));
     }
 }
