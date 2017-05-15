@@ -1,6 +1,5 @@
 package org.teamavion.pcomp.gui;
 
-import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -11,17 +10,9 @@ import org.teamavion.pcomp.PComp;
 import org.teamavion.pcomp.net.DataListener;
 import org.teamavion.pcomp.tile.TileEntityComputer;
 import org.teamavion.util.support.NetworkChannel;
-import org.teamavion.util.support.Reflection;
-import org.teamavion.util.support.Result;
 
-import javax.tools.JavaCompiler;
-import javax.tools.ToolProvider;
-import java.io.*;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 
 @SuppressWarnings({"unchecked", "WeakerAccess"})
@@ -37,7 +28,12 @@ public class GUIComputer extends GuiScreen implements DataListener<HashMap<Integ
     protected GuiTextField[] inputLines;
     protected GuiButton button;
 
-    public GUIComputer(TileEntityComputer computer){ this.computer = computer; }
+    public GUIComputer(TileEntityComputer computer){
+        this.computer = computer;
+        NBTTagCompound n = new NBTTagCompound();
+        n.setString("update", "");
+        PComp.instance.channel.sendToServer(new NetworkChannel.WorldEvent(computer.getPos(), computer.getWorld().provider.getDimension(), n));
+    }
 
     @Override
     public void drawBackground(int tint) {
@@ -188,71 +184,24 @@ public class GUIComputer extends GuiScreen implements DataListener<HashMap<Integ
                 break;
             }
         if(button.mousePressed(Minecraft.getMinecraft(), mouseX, mouseY)){
-            StringBuilder sb = new StringBuilder();
-            File f = File.createTempFile("exec", ".java");
-            ArrayList<GuiTextField> skip = new ArrayList<>();
-            for(GuiTextField t : inputLines) if(t.getText().startsWith("import ") && t.getText().endsWith(";")){ skip.add(t); sb.append(t.getText()); }
-            sb.append("public class ").append(f.getName().substring(0, f.getName().length() - 5)).append("{public static void main(String[] args){");
-            for(GuiTextField t : inputLines) if(!skip.contains(t)) sb.append(t.getText());
-            sb.append("}}");
-            JavaCompiler jc = ToolProvider.getSystemJavaCompiler();
-            try (OutputStream out = new FileOutputStream(f)) { out.write(sb.toString().getBytes()); }
-            int result = jc.run(null, null, null, f.getAbsolutePath());
-            if(result==0){
-                //noinspection ResultOfMethodCallIgnored
-                f.delete();
-                f = new File(f.getAbsolutePath().substring(0, f.getAbsolutePath().length()-5)+".class");
-                byte[] b;
-                try{
-                    InputStream i = new FileInputStream(f);
-                    ArrayList<Byte> a = new ArrayList<>();
-                    byte[] b1 = new byte[4096];
-                    int i1;
-                    while(i.available()>0){
-                        i1 = i.read(b1);
-                        for(int j = 0; j<i1; ++j) a.add(b1[j]);
-                    }
-                    i.close();
-                    b = new byte[a.size()];
-                    for(int j = 0; j<a.size(); ++j) b[j] = a.get(j);
-                }catch(Exception e){ return; }
-                finally {
-                    //noinspection ResultOfMethodCallIgnored
-                    f.delete();
-                }
-                Result<Class<?>> compiled = (Result<Class<?>>) Reflection.invokeMethod(
-                        Reflection.getMethod(ClassLoader.class, "defineClass", byte[].class, int.class, int.class),
-                        GUIComputer.class.getClassLoader(),
-                        b,
-                        0,
-                        b.length);
-                if(compiled.success){
-                    for(Method m : compiled.value.getDeclaredMethods())
-                        if(m.getName().equals("main") && Modifier.isStatic(m.getModifiers()) && Arrays.equals(m.getParameterTypes(), new Class<?>[]{String[].class}))
-                        {
-                            m.setAccessible(true);
-                            try {
-                                m.invoke(null, (Object) new String[]{});
-                            } catch (IllegalAccessException | InvocationTargetException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                }
-            }
+                NBTTagCompound n = new NBTTagCompound();
+                n.setString("exec", "");
+                sync(n);
         }
     }
 
     @Override
     public void onGuiClosed() {
         computer.unregisterDataListener(this);
-        for(int i = 0; i<inputLines.length; ++i) computer.writeLine(i, inputLines[i].getText());
-        NBTTagCompound n = new NBTTagCompound();
-        computer.writeToNBT(n);
-        JsonObject j = new JsonObject();
-        j.addProperty("tag", n.toString().replace("&", "&amp;").replace("\"", "&quot;").replace("{", "&lbr;").replace("}", "&rbr;"));
-        PComp.instance.channel.sendToServer(new NetworkChannel.WorldEvent(computer.getPos(), computer.getWorld().provider.getDimension(), j));
-        computer.markDirty();
+        sync(new NBTTagCompound());
         super.onGuiClosed();
+    }
+
+    protected void sync(NBTTagCompound n){
+        for(int i = 0; i<inputLines.length; ++i) computer.writeLine(i, inputLines[i].getText());
+        computer.writeToNBT(n);
+        PComp.instance.channel.sendToServer(new NetworkChannel.WorldEvent(computer.getPos(), computer.getWorld().provider.getDimension(), n));
+        computer.markDirty();
     }
 
     @Override

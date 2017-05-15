@@ -23,6 +23,8 @@ public class Computer extends Block {
 
     @Override
     public boolean onBlockActivated(World worldIn, BlockPos pos, IBlockState state, EntityPlayer playerIn, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
+        TileEntity t = worldIn.getTileEntity(pos);
+        if(t!=null) t.setPos(pos);
         playerIn.openGui(PComp.instance, ID_COMPUTER, worldIn, pos.getX(), pos.getY(), pos.getZ());
         return true;
     }
@@ -30,7 +32,9 @@ public class Computer extends Block {
     @Nullable
     @Override
     public TileEntity createTileEntity(World world, IBlockState state) {
-        return new TileEntityComputer();
+        TileEntityComputer t = new TileEntityComputer();
+        t.setWorld(world);
+        return t;
     }
 
     @Override

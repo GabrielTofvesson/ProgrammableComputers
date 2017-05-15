@@ -1,6 +1,5 @@
 package org.teamavion.pcomp.gui;
 
-import com.google.gson.JsonObject;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -26,9 +25,8 @@ public class GUIHandler implements IGuiHandler{
                 TileEntity t = world.getTileEntity(new BlockPos(x, y, z));
                 if(!(t instanceof TileEntityComputer)) return null; // Something went wrong. ID-clash maybe?
                 NBTTagCompound n = new NBTTagCompound();
-                t.writeToNBT(n);JsonObject j = new JsonObject();
-                j.addProperty("tag", n.toString().replace("&", "&amp;").replace("\"", "&quot;").replace("{", "&lbr;").replace("}", "&rbr;"));
-                PComp.instance.channel.sendTo(new NetworkChannel.WorldEvent(new BlockPos(x, y, z), world.provider.getDimension(), j), (EntityPlayerMP) player);
+                t.writeToNBT(n);
+                PComp.instance.channel.sendTo(new NetworkChannel.WorldEvent(new BlockPos(x, y, z), world.provider.getDimension(), n), (EntityPlayerMP) player);
                 return new ContainerComputer((TileEntityComputer) t);
         }
         return null;

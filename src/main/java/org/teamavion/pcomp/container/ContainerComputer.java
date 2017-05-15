@@ -8,7 +8,11 @@ public class ContainerComputer extends Container{
 
     protected final TileEntityComputer computer;
 
-    public ContainerComputer(TileEntityComputer computer){ this.computer = computer; }
+    public ContainerComputer(TileEntityComputer computer){
+        this.computer = computer;
+        computer.getWorld().scheduleBlockUpdate(computer.getPos(), computer.getBlockType(), 0, 0);
+        computer.markDirty();
+    }
 
     @Override
     public boolean canInteractWith(EntityPlayer playerIn) {

@@ -1,8 +1,6 @@
 package org.teamavion.pcomp;
 
-import net.minecraft.nbt.JsonToNBT;
-import net.minecraft.nbt.NBTException;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldProvider;
@@ -12,6 +10,7 @@ import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.GameRegistry;
+import net.minecraftforge.fml.relauncher.Side;
 import org.teamavion.pcomp.blocks.Computer;
 import org.teamavion.pcomp.gui.GUIHandler;
 import org.teamavion.pcomp.tile.TileEntityComputer;
@@ -19,9 +18,6 @@ import org.teamavion.util.automation.BlockRegister;
 import org.teamavion.util.automation.SetupHelper;
 import org.teamavion.util.support.NetworkChannel;
 import org.teamavion.util.support.Reflection;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Mod(modid = PComp.MODID, version = PComp.VERSION)
 public class PComp
@@ -42,23 +38,18 @@ public class PComp
         SetupHelper.registerRenders(PComp.class);
         channel = new NetworkChannel(MODID);
         channel.registerWorldHandler((side, worldEvent) -> {
-            World w = (World) Reflection.getValue("world", DimensionManager.getProvider((Integer) Reflection.getValue("id", worldEvent, worldEvent.getClass())), WorldProvider.class); // Get World
+            World w = (World) (side==Side.SERVER?
+                    Reflection.getValue("world", DimensionManager.getProvider((Integer) Reflection.getValue("id", worldEvent, worldEvent.getClass())), WorldProvider.class):
+                    Reflection.getValue("world", Minecraft.getMinecraft(), Minecraft.class)); // Get World
             TileEntity t = w.getTileEntity(worldEvent.getPos());
-            try {
-                if (t != null) {
-                    Matcher m = Pattern.compile("(\\d+):(\\d+):(\\d+);(\\d+);(.+)").matcher(worldEvent.getData());
-                    if(!m.matches()) throw new RuntimeException();
-                    String s1;
-                    NBTTagCompound n = JsonToNBT.getTagFromJson((s1=m.group(5)).substring(8, s1.length()-1)
-                            .replace("&rbr;", "}")
-                            .replace("&lbr;", "{")
-                            .replace("&quot;", "\"")
-                            .replace("&amp;", "&"));
-                    t.readFromNBT(n);
-                }
-            } catch (NBTException e) {
-                e.printStackTrace();
+            if (t == null){
+                System.err.println("A referenced TileEntity ("+worldEvent.getPos().toString()+") was null!");
+                return null;
             }
+            t.readFromNBT(worldEvent.getEvent());
+            t.markDirty();
+            if(worldEvent.getEvent().hasKey("update")) return new NetworkChannel.WorldEvent(t.getPos(), t.getWorld().provider.getDimension(), t.serializeNBT());
+            if(worldEvent.getEvent().hasKey("exec")) if(t instanceof TileEntityComputer) ((TileEntityComputer) t).exec();
             return null;
         });
         NetworkRegistry.INSTANCE.registerGuiHandler(this, new GUIHandler());
